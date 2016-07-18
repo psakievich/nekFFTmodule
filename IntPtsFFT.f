@@ -66,27 +66,32 @@ C     FFT in the theta direction
       include 'TOTAL'
       include 'MYFFT'
 
-      parameter,real::PI=4.0*atan(1.0)
+      real PI
+
       integer i,j,k,ii
 
-      real dR=1.0/nFFTlx1, dTheta=2.0*PI/nFFTly1, dZ=1.0/nFFTlz1
+      real dX, dY
+
+      PI=4.0*atan(1.0)
+      dX=2.0*PI/nFFTlx1
+      dY=2.0*PI/nFFTly1
 
       ! Good idea to zero out any thing that won't be using an FFT
       if(nid.gt.nFFTprocs) then
        do i=1,nFFTtotal
           rFFTpts(1,i)=0.0
           rFFTpts(2,i)=0.0
-          if(if3d) rFFTpts(3,1)=0.0
+          !if(if3d) rFFTpts(3,1)=0.0
        end do
       else !Initialize fields for processors of interest
        do i=1,nFFTlx1
           do j=1,nFFTly1
-             do k=1,nFFTlz1
+             !do k=1,nFFTlz1
                 ii=k+j*nFFTlz1+i*nFFTlz1*nFFTly1
-                rFFTpts(1,ii)=(i-1)*dR
-                rFFTpts(2,ii)=(j-1)*dTheta
-                if(if3d) rFFTpts(3,ii)=(k-1)*dZ
-             end do
+                rFFTpts(1,ii)=(i-1)*dX
+                rFFTpts(2,ii)=(j-1)*dY
+                !if(if3d) rFFTpts(3,ii)=(k-1)*dZ
+             !end do
           end do
        end do
       end if
@@ -106,17 +111,16 @@ C     DO NOT confuse rFFTvals and cFFTvals
       include 'TOTAL'
       include 'MYFFT'
 
-      !integer nFFTsetup !Integer for if initialization been performed
-      !integer inth_hpts !Handle for intpts routines
       integer nxyz
       integer ntot
-      !save    inth_hpts
-      data nxyz,ntot /nx1*ny1*nz1,nx1*ny1*nz1*nelt/
+
+      nxyz=nx1*ny1*nz1
+      ntot=nxyz*nelt
 
       nFFTitp_handle=0
 
       !Perform setup on first call
-      call inpts_setup(-1.0,nFFTitp_handle)
+      call intpts_setup(-1.0,nFFTitp_handle)
 
       ! pack working array
       if(ifvo) then
