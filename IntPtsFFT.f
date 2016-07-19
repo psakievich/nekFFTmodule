@@ -24,7 +24,7 @@ C     It is the users responsibility to ensure that the:
 C
 C     1) The way the points are defined are compatible with the FFT they
 C        intend to perform.
-
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE MYFFT
       subroutine MyFFT()
       include 'SIZE'
@@ -36,9 +36,10 @@ C     SUBROUTINE MYFFT
       data nFFTSetup /0/ !initialize value to zero
       save nFFTSetup     !save value between subsequent calls
 
+
       ! 1) Make sure a valid number of processors are present
-      if(nFFTProcs<np) then
-         if(nid.eq.0)write(6,*),"ERROR FFT: FFT Procs< Total processors"
+      if(nFFTp2c>np) then
+         if(nid.eq.0)write(6,*),"ERROR FFT: FFTp2c> Total processors"
          call exitt()
       end if
 
@@ -52,11 +53,16 @@ C     SUBROUTINE MYFFT
 
       ! 3) Perform Interpolation
            call FFT_Interp_Points()
-      ! 4) If desired write to file
+      ! 4) Perform Transform
+           call FFT_Transform()
+      ! ) Destroy Plan
+           call dfftw_destroy_plan_(nFFTplan)
+      ! ) If desired write to file
+           call exitt()
 
       return
       end
-
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE DEFINE POINTS
 C     Users should use this to define the sampling points they want for
 C     their FFT's. This example will be for points in a cylinder with
@@ -77,7 +83,7 @@ C     FFT in the theta direction
       dY=2.0*PI/nFFTly1
 
       ! Good idea to zero out any thing that won't be using an FFT
-      if(nid.gt.nFFTprocs) then
+      if(nid.gt.nFFTp2c) then
        do i=1,nFFTtotal
           rFFTpts(1,i)=0.0
           rFFTpts(2,i)=0.0
@@ -100,7 +106,7 @@ C     FFT in the theta direction
 
       return
       end
-
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FIND POINTS
 C     Find the points that will be used for the FFT and interpolate them
 C     to the array rFFTvals.  Note that rFFTvals is type real, and when
@@ -110,14 +116,16 @@ C     DO NOT confuse rFFTvals and cFFTvals
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-
-      integer nxyz
+      common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
+      integer nxyz, nflds
       integer ntot
 
       nxyz=nx1*ny1*nz1
       ntot=nxyz*nelt
 
       nFFTitp_handle=0
+      !Map pressure to grid1
+      call prepost_map(0)
 
       !Perform setup on first call
       call intpts_setup(-1.0,nFFTitp_handle)
@@ -129,14 +137,17 @@ C     DO NOT confuse rFFTvals and cFFTvals
         if(if3d) call copy(rFFTwrk(1,ndim),vz,ntot)
         nflds = ndim
       endif
+
       if(ifpo) then
         nflds = nflds + 1
-        call copy(rFFTwrk(1,nflds),pm1,ntot)
+        call copy(rFFTwrk(1,nFFTflds),pm1,ntot)
       endif
+
       if(ifto) then
         nflds = nflds + 1
-        call copy(rFFTwrk(1,nflds),t,ntot)
+        call copy(rFFTwrk(1,nFFTflds),t,ntot)
       endif
+
       do i = 1,ldimt
          if(ifpsco(i)) then
            nflds = nflds + 1
@@ -171,11 +182,14 @@ C     DO NOT confuse rFFTvals and cFFTvals
            endif
         enddo
 
+      !Map pressure back to grid2
+      call prepost_map(1)
+
       if(nio.eq.0) write(6,*) 'done::FFT points found'
 
       return
       end
-
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FFT INTERP POINTS
 C     This is the routine where the actual interpolation takes place
       subroutine FFT_INTERP_POINTS()
@@ -205,6 +219,7 @@ C     This is the routine where the actual interpolation takes place
 
       return
       end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FFT CREATE PLAN
 C     FFTW requires plans for performing FFT's to be generated. These
 C     must also be destroyed later.  Documenation can be found in the
@@ -218,8 +233,113 @@ C     fftw resources online.
       ! I will use one of the most general plans fftw_plan_many_dft_r2c
       ! it requires the following parameters:
 
+      integer rank,n(nFFTorder),howmany, idist, odist, istride, ostride,
+     $  inembed(nFFTorder), enembed(nFFTorder), swap
+
+      !This shares the memory for n and the embedding.  My routine
+      !does not function with embedded FFT for padding etc. If you need
+      !embedding you will need to modify this routine
+      equivalence (n,inembed)
+      equivalence (n,enembed)
+
+      !Set up FFT plan parameters
+      rank=nFFTorder !order of FFT 1d, 2d, 3d
+
+      !Sort nFFTd2t to make sure it is ordered lowest to highest
+      if (rank.gt.1) then
+        do i=1,rank-1
+            if(n(i).gt.nFFTd2t(i+1))then
+               swap=nFFTd2t(i+1)
+               nFFTd2t(i+1)=nFFTd2t(i)
+               nFFTd2t(i)=swap
+            end if
+        end do
+      end if
+
+
+      ! 1-D FFT parameters----------------------------------------
+      if(rank.eq.1)then
+        if(nFFTd2t(1).eq.1)then
+           n(1)=nFFTlx1 !size of FFT
+           istride=1  !distance between points in memory
+           idist=nFFTlx1 !dist between first elements of different FFTs
+           howmany=nFFTtotal/nFFTlx1*nFFTflds !total num FFTs
+         else if(nFFTd2t(1).eq.2) then
+           n(1)=nFFTly1
+           istride=nFFTlx1
+           idist=1
+           howmany=nFFTtotal/nFFTly1*nFFTflds
+         else if(if3d.and.nFFTd2t(1).eq.3) then
+           n(1)=nFFTlz1
+           istride=nFFTlx1*nFFTly1
+           idist=1
+           howmany=nFFTtotal/nFFTlz1*nFFTflds
+         else
+           go to 100
+         endif
+      ! 2-D FFT parameters----------------------------------------
+      else if(rank.eq.2)then
+        if(nFFTd2t(1).eq.1) then
+           n(1)=nFFTlx1
+           istride=1
+           if(nFFTdt2(2).eq.2)then
+           ! FFT in dimensions 1 and 2 of pts array
+              n(2)=nFFTly1
+              idist=nFFTlx1*nFFTly1
+              howmany=nFFTlz1*nFFTflds
+           else
+           ! FFT in dimensions 1 and 3 of pts array
+           ! currently not sure how this would work since
+           ! it would require 2 different strides. Therefore,
+           ! I choose not to support it
+              go to 100
+           endif
+        else
+        ! FFT in dimensions 2 and 3 of pts array
+          n(1)=nFFTly1
+          n(2)=nFFTlz1
+          idist=1
+          istride=nFFTlx1
+          howmany=nFFTlx1*nFFTflds
+        endif
+      else if (rank.eq.3)then
+      ! 3-D FFT parameters----------------------------------------
+        n(1)=nFFTlx1
+        n(2)=nFFTly1
+        n(3)=nFFTlz1
+        idist=1
+        istride=1
+        howmany=nFFTflds
+      else
+        go to 100
+      end if
+
+      ostride=istride
+      odist=idist
+
+      call dfftw_plan_many_dft_r2c(nFFTplan,rank,n,howmany,rFFTvals,
+     $                              inembed,istride,idist,cFFTvals,
+     $                              onembed,ostride,odist,FFTW_ESTIMATE)
+
+      if(nio.eq.0) write(6,*) 'done::FFT plan creation'
+      return
+ 100  write(6,*) 'ERROR:: unsupported nFFTd2t entry'
+      call exitt()
+
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+C     SUBROUTINE PERFORM FFT
+      subroutine FFT_TRANSFORM()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+
+      call dfftw_execute_(nFFTplan,rFFTvals,cFFTvals)
+
+      if(nio.eq.0) write(6,*) 'done::FFT transform'
 
       return
       end
-C     SUBROUTINE PERFORM FFT
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE PRINT FFT DATA TO TEXT

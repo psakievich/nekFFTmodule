@@ -4,48 +4,59 @@ C**********************************************************************
       include "fftw3.f" !lib with FFTW type definitions
 C*****COMMON BLOCK FOR INTEGERS****************************************
       ! Variable names and definitions
-C----------------------------------------------------------------------  
-        !Number of processors that will use FFT
-      integer, parameter::nFFTProcs=2                   
-        !Local sampling of field (any FFT dim must span global domain)
+C----------------------------------------------------------------------
+C--------------Start user input for parameters
+C---------------------------------------------
+    !Number of processors that will use FFT
+      integer, parameter::nFFTp2c=2                   
+    !Local sampling of field (any FFT dim must span global domain)
       integer, parameter::nFFTlx1=1,nFFTly1=16,nFFTlz1=1
-        !Total number of points in the local FFT domain
-      integer, parameter::nFFTtotal=nFFTlx1*nFFTly1*nFFTlz1 
-        !Order of FFT (1d,2d,3d)=1,2,3
+    !Order of FFT (1d,2d,3d)=1,2,3
       integer, parameter::nFFTorder=1
-        !Number of fields to perform FFT on
+    !Number of fields to perform FFT on
       integer, parameter::nFFTflds=ldim !+ldimt+1
-        !Physical dimensions to perform FFT
+    !Total number of points in the local FFT domain
+      integer, parameter::nFFTtotal=nFFTlx1*nFFTly1*nFFTlz1
+C---------------------------------------------
+C---------------End user input for parameters 
+C---------------------------------------------     
+    !Physical dimensions to perform FFT
       integer nFFTd2t(nFFTorder)
-        !Parameter for error codes in findpnts
+    !Parameter for error codes in findpnts
       integer nFFTrcode(nFFTtotal)
-        !Array for element id's where points exist
+    !Array for element id's where points exist
       integer nFFTelid(nFFTtotal)
-        !Array for which processor the points are stored on
+    !Array for which processor the points are stored on
       integer nFFTproc(nFFTtotal)
-        !Handle for intpts routines
+    !Handle for intpts routines
       integer nFFTitp_handle
-        !FFT plan used by FFTW
+    !FFT plan used by FFTW
       integer*8 nFFTplan                     
       
-C----------------------------------------------------------------------      
-      COMMON /INTMYFFT/ nFFTd2t, nFFTrcode,nFFTelid,nFFTproc, 
-     $ nFFTitp_handle, nFFTplan 
+C----------------------------------------------------------------------
+C----------User Input Start
+C DETERMINE WHICH DIRECTIONS YOU WANT TO TRANFORM HERE:
+      data nFFTd2t /1/
+C----------User Input End
+      
+      COMMON /INTMYFFT/ nFFTrcode,nFFTelid,nFFTproc, 
+     $ nFFTitp_handle
+      COMMON /INT8MYFFT/ nFFTplan 
 C----------------------------------------------------------------------
 
      
 C*****COMMON BLOCK FOR REALS*******************************************
       ! Variable names and definitions
 C----------------------------------------------------------------------
-        !Spatial localtion of points for interpolated values
+    !Spatial localtion of points for interpolated values
       real rFFTpts(ldim,nFFTtotal) 
-        !Working array for findpnts
+    !Working array for findpnts
       real rFFTwrk(lx1*ly1*lz1*lelt,nFFTflds)
-        !Values that are stored from findpnts
+    !Values that are stored from findpnts
       real rFFTvals(nFFTflds,nFFTtotal)
-        !Distance away from point
+    !Distance away from point
       real rFFTdist(nFFTtotal)
-        !Location of point in the local coordinates for the given element
+    !Location of point in the local coordinates for the given element
       real rFFTrst(nFFTtotal*ldim)
       
 C----------------------------------------------------------------------
