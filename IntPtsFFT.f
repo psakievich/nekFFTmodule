@@ -47,18 +47,21 @@ C     SUBROUTINE MYFFT
       if(nFFTSetup.eq.0) then
            call FFT_Define_Points()
            call FFT_Find_Points()
-           call FFT_Create_Plan()
-           nFFTSetup=1
       end if
+      if(nFFTdauto.ne.1.or.nFFTsetup.eq.0)then
+           call FFT_Create_Plan()
+      endif
+      nFFTSetup=1
 
       ! 3) Perform Interpolation
            call FFT_Interp_Points()
       ! 4) Perform Transform
            call FFT_Transform()
-      ! ) Destroy Plan
-           call dfftw_destroy_plan_(nFFTplan)
-      ! ) If desired write to file
-           call exitt()
+      ! 5) Destroy Plan
+          if(nFFTdeauto.ne.1)then
+           call FFT_Destroy_Plan()
+          end if
+      ! 6) If desired write to file
 
       return
       end
@@ -87,17 +90,17 @@ C     FFT in the theta direction
        do i=1,nFFTtotal
           rFFTpts(1,i)=0.0
           rFFTpts(2,i)=0.0
-          !if(if3d) rFFTpts(3,1)=0.0
+          if(if3d) rFFTpts(3,1)=0.0
        end do
       else !Initialize fields for processors of interest
        do i=1,nFFTlx1
           do j=1,nFFTly1
-             !do k=1,nFFTlz1
+             do k=1,nFFTlz1
                 ii=k+j*nFFTlz1+i*nFFTlz1*nFFTly1
                 rFFTpts(1,ii)=(i-1)*dX
                 rFFTpts(2,ii)=(j-1)*dY
-                !if(if3d) rFFTpts(3,ii)=(k-1)*dZ
-             !end do
+                if(if3d) rFFTpts(3,ii)=(k-1)*dZ
+             end do
           end do
        end do
       end if
@@ -323,9 +326,9 @@ C     fftw resources online.
 
       if(nio.eq.0) write(6,*) 'done::FFT plan creation'
       return
- 100  write(6,*) 'ERROR:: unsupported nFFTd2t entry'
+ 100  if(nid.eq.0) write(6,*) 'ERROR:: unsupported nFFTd2t entry'
       call exitt()
-
+      return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE PERFORM FFT
@@ -339,6 +342,18 @@ C     SUBROUTINE PERFORM FFT
 
       if(nio.eq.0) write(6,*) 'done::FFT transform'
 
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+C     SUBROUTINE DESTROY FFT PLAN
+      subroutine FFT_DESTROY_PLAN()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+
+      call dfftw_destroy_plan_(nFFTplan)
+      if(nio.eq.0) write(6,*) 'done::FFT plan destroyed'
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

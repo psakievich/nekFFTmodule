@@ -1,25 +1,35 @@
 mpif77 -c  -O3 -fdefault-real-8 -fdefault-double-8 -x f77-cpp-input -DPTRSIZE8 -DMPI -DMPI -DLONGINT8 -DUNDERSCORE -DGLOBAL_LONG_LONG -I/Users/psakievich/Documents/workspace/nekFFTmodule -I/Users/psakievich/soft/Nek5000/core -I./ IntPtsFFT.f -o obj/IntPtsFFT.o
-IntPtsFFT.f:166.31:
+IntPtsFFT.f:93.27:
+
+          if(if3d) rFFTpts(3,1)=0.0                                     
+                           1
+Warning: Array reference at (1) is out of bounds (3 > 2) in dimension 1
+IntPtsFFT.f:102.33:
+
+                if(if3d) rFFTpts(3,ii)=(k-1)*dZ                         
+                                 1
+Warning: Array reference at (1) is out of bounds (3 > 2) in dimension 1
+IntPtsFFT.f:169.31:
 
      &                 rFFTpts(3,1),ndim,nFFTtotal)                     
                                1
 Warning: Array reference at (1) is out of bounds (3 > 2) in dimension 1
-IntPtsFFT.f:287.16:
+IntPtsFFT.f:290.16:
 
               n(2)=nFFTly1                                              
                 1
 Warning: Array reference at (1) is out of bounds (2 > 1) in dimension 1
-IntPtsFFT.f:300.12:
+IntPtsFFT.f:303.12:
 
           n(2)=nFFTlz1                                                  
             1
 Warning: Array reference at (1) is out of bounds (2 > 1) in dimension 1
-IntPtsFFT.f:308.10:
+IntPtsFFT.f:311.10:
 
         n(2)=nFFTly1                                                    
           1
 Warning: Array reference at (1) is out of bounds (2 > 1) in dimension 1
-IntPtsFFT.f:309.10:
+IntPtsFFT.f:312.10:
 
         n(3)=nFFTlz1                                                    
           1
@@ -30,6 +40,6 @@ mpif77 -o nek5000  obj/eddy_uv.o obj/drive.o obj/drive1.o obj/drive2.o obj/plan4
 #                  Compilation successful!                  #
 #############################################################
 __TEXT	__DATA	__OBJC	others	dec	hex
-3829760	92422144	0	4295200768	4391452672	105c04000	
+3833856	92422144	0	4295200768	4391456768	105c05000	
 
 

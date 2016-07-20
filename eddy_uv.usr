@@ -179,6 +179,7 @@ c
       v0   = param(97)
       if(istep.eq.0) then
         call MYFFT()
+        call exitt()
       endif 
       call exact  (ue,ve,xm1,ym1,n,time,visc,u0,v0)
       if (istep.eq.0     ) call outpost(ue,ve,vx,pr,t,'   ')

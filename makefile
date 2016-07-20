@@ -1,4 +1,4 @@
-### makefile automatically created by makenek 07/19/2016 12:32:46 ###
+### makefile automatically created by makenek 07/19/2016 17:34:01 ###
 BINNAME=nek5000
 LIBNAME=libnek5000.a
 CASENAME:=eddy_uv

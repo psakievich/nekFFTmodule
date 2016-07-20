@@ -17,6 +17,8 @@ C---------------------------------------------
       integer, parameter::nFFTflds=ldim !+ldimt+1
     !Total number of points in the local FFT domain
       integer, parameter::nFFTtotal=nFFTlx1*nFFTly1*nFFTlz1
+    !Destroy fftw plan manually (1) or automatically (anything else)
+      integer, parameter::nFFTdmanual=1
 C---------------------------------------------
 C---------------End user input for parameters 
 C---------------------------------------------     
