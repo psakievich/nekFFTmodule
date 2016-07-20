@@ -1,0 +1,31 @@
+***********************************************************************
+****      FFT Module for Nek5000
+****      Created by: Phil Sakievich
+****      Email:      psakievi@asu.edu
+****      Utilizing:  FFTW (www.fftw.org) and file from jburkardt's 
+****                  website.  See header in 'MYFFT' for full details
+****     
+****      First posted to github on July 20th, 2016
+***********************************************************************
+
+This module is utilizies the native intpnts routines within nek5000 to 
+allow users to sample their data and then take FFT's of that data. 
+To use these routines FFTW3 must be installed on your system, and linked
+through the makenek file.  An example makenek file has been included.
+
+Sampeling size is declared in the file 'MYFFT' which contains common 
+blocks and parameters (basically the 'SIZE' file for the FFT routines).
+You do not need to worry about the hpts routines, or the lhis parameter
+in the SIZE file.  All of the variables are independent for this routine.
+ 
+Domains can be decomposed, to different processors, but not in the
+directions the FFT's will be performed.  For example, if doing 2d fft's 
+of planes in a 3d data set, the entire 2d plane must be specified on a 
+given processor, but different planes may be allocated to different 
+processors.  FFTW is being used in a serial sense, and domain 
+decomposition is placed on the user in the FFT_DEFINE_POINTS subroutine.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!IMPORTANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+This is a USE AT YOUR OWN RISK routine and has not been tested or approved
+for use in nek5000 by anyone from the development team.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!IMPORTANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
