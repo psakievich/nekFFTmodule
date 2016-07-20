@@ -10,11 +10,11 @@ C---------------------------------------------
     !Number of processors that will use FFT
       integer, parameter::nFFTp2c=2                   
     !Local sampling of field (any FFT dim must span global domain)
-      integer, parameter::nFFTlx1=1,nFFTly1=16,nFFTlz1=1
+      integer, parameter::nFFTlx1=16,nFFTly1=16,nFFTlz1=1
     !Order of FFT (1d,2d,3d)=1,2,3
-      integer, parameter::nFFTorder=1
+      integer, parameter::nFFTorder=2
     !Number of fields to perform FFT on
-      integer, parameter::nFFTflds=ldim !+ldimt+1
+      integer, parameter::nFFTflds=ldim+1+ldimt !plus 1 is for pressure
     !Total number of points in the local FFT domain
       integer, parameter::nFFTtotal=nFFTlx1*nFFTly1*nFFTlz1
     !Destroy fftw plan manually (1) or automatically (anything else)
@@ -38,7 +38,7 @@ C---------------------------------------------
 C----------------------------------------------------------------------
 C----------User Input Start
 C DETERMINE WHICH DIRECTIONS YOU WANT TO TRANFORM HERE:
-      data nFFTd2t /1/
+      data nFFTd2t /1,2/
 C----------User Input End
       
       COMMON /INTMYFFT/ nFFTrcode,nFFTelid,nFFTproc, 

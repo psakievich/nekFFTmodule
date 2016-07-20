@@ -48,7 +48,7 @@ C     SUBROUTINE MYFFT
            call FFT_Define_Points()
            call FFT_Find_Points()
       end if
-      if(nFFTdauto.ne.1.or.nFFTsetup.eq.0)then
+      if(nFFTdmanual.ne.1.or.nFFTsetup.eq.0)then
            call FFT_Create_Plan()
       endif
       nFFTSetup=1
@@ -58,11 +58,11 @@ C     SUBROUTINE MYFFT
       ! 4) Perform Transform
            call FFT_Transform()
       ! 5) Destroy Plan
-          if(nFFTdeauto.ne.1)then
+          if(nFFTdmanual.ne.1)then
            call FFT_Destroy_Plan()
           end if
       ! 6) If desired write to file
-
+           call FFT_ASCII_PRINT()
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -90,16 +90,17 @@ C     FFT in the theta direction
        do i=1,nFFTtotal
           rFFTpts(1,i)=0.0
           rFFTpts(2,i)=0.0
-          if(if3d) rFFTpts(3,1)=0.0
+          if(if3d) rFFTpts(3,i)=0.0
        end do
       else !Initialize fields for processors of interest
-       do i=1,nFFTlx1
+       do i=1,nFFTlz1
           do j=1,nFFTly1
-             do k=1,nFFTlz1
-                ii=k+j*nFFTlz1+i*nFFTlz1*nFFTly1
-                rFFTpts(1,ii)=(i-1)*dX
-                rFFTpts(2,ii)=(j-1)*dY
-                if(if3d) rFFTpts(3,ii)=(k-1)*dZ
+             do k=1,nFFTlx1
+                ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
+                rFFTpts(1,ii)=dx*(k-1)
+                rFFTpts(2,ii)=dy*(j-1)
+                if(if3d) rFFTpts(3,ii)=(i-1)*dZ
+
              end do
           end do
        end do
@@ -285,7 +286,7 @@ C     fftw resources online.
         if(nFFTd2t(1).eq.1) then
            n(1)=nFFTlx1
            istride=1
-           if(nFFTdt2(2).eq.2)then
+           if(nFFTd2t(2).eq.2)then
            ! FFT in dimensions 1 and 2 of pts array
               n(2)=nFFTly1
               idist=nFFTlx1*nFFTly1
@@ -357,4 +358,41 @@ C     SUBROUTINE DESTROY FFT PLAN
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-C     SUBROUTINE PRINT FFT DATA TO TEXT
+C     SUBROUTINE PRINT FFT DATA TO TEXT FILE
+      subroutine FFT_ASCII_PRINT()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+
+      integer nFileNum,nFileErr
+      character*32 filename
+      data nFileNum /1/
+      save nFileNum
+
+      !Each processor will write to the same file one at a time
+      do i=1,nFFTp2c
+       !if i=my rank then write data
+       if(nid.eq.i-1) then
+         write(filename,"('myFFT',I0,'.dat')")nFileNum
+
+         !if rank=0 create new file, else open old file
+         if(i.eq.1)then
+           open(unit=10,file=filename,iostat=nFileErr,status='REPLACE')
+         else
+           open(unit=10,file=filename,iostat=nFileErr,status='OLD',
+     $      access='APPEND')
+         end if
+
+         do j=1,nFFTtotal
+           write(10,*) (rFFTpts(ii,j),ii=1,ldim),(cFFTvals(ii,j),
+     $     ii=1,nFFTflds)
+         end do
+
+         close(unit=10)
+       endif
+       call nekgsync()
+      end do
+      if(nio.eq.0) write(6,*) 'done::FFT results printed to file'
+      return
+      end

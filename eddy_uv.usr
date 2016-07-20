@@ -179,6 +179,7 @@ c
       v0   = param(97)
       if(istep.eq.0) then
         call MYFFT()
+        call FFT_DESTROY_PLAN()
         call exitt()
       endif 
       call exact  (ue,ve,xm1,ym1,n,time,visc,u0,v0)
