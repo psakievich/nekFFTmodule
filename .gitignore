@@ -1,9 +1,9 @@
 makefile
 obj/
 fort*
-eddy_uv.f
+eddy_uv*
 *dat
 *out
-eddy_uv.sch1
-eddy_uv0.*
 nek5000
+fftw3_prb.f
+SIZE
