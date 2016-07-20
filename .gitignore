@@ -7,3 +7,4 @@ eddy_uv*
 nek5000
 fftw3_prb.f
 SIZE
+.*project
