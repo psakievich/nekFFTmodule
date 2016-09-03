@@ -78,12 +78,16 @@ C     FFT in the theta direction
       real PI
 
       integer i,j,k,ii
+      integer nOffX,nOffY,nOffZ
 
       real dX, dY
 
       PI=4.0*atan(1.0)
-      dX=2.0*PI/nFFTlx1
-      dY=2.0*PI/nFFTly1
+      dX=2.0*PI/(nFFTlx1*nFFTblX)
+      dY=2.0*PI/(nFFTly1*nFFTblY)
+
+      !Determine local offset of points
+      call FFT_OFFSET(nid,nOffX,nOffY,nOffZ)
 
       ! Good idea to zero out any thing that won't be using an FFT
       if(nid.gt.nFFTp2c) then
@@ -97,16 +101,16 @@ C     FFT in the theta direction
           do j=1,nFFTly1
              do k=1,nFFTlx1
                 ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
-                rFFTpts(1,ii)=dx*(k-1)
-                rFFTpts(2,ii)=dy*(j-1)
-                if(if3d) rFFTpts(3,ii)=(i-1)*dZ
+                rFFTpts(1,ii)=dX*(k-1+nOffX)
+                rFFTpts(2,ii)=dY*(j-1+nOffY)
+                if(if3d) rFFTpts(3,ii)=dZ*(i-1+nOffZ)
 
              end do
           end do
        end do
       end if
 
-      if(nio.eq.0) write(6,*) 'done::FFT points declared'
+      if(nid.eq.0) write(6,*) 'done::FFT points declared'
 
       return
       end
@@ -189,7 +193,7 @@ C     DO NOT confuse rFFTvals and cFFTvals
       !Map pressure back to grid2
       call prepost_map(1)
 
-      if(nio.eq.0) write(6,*) 'done::FFT points found'
+      if(nid.eq.0) write(6,*) 'done::FFT points found'
 
       return
       end
@@ -219,7 +223,7 @@ C     This is the routine where the actual interpolation takes place
 
       !Map pressure back to grid2
       call prepost_map(1)
-      if(nio.eq.0) write(6,*) 'done::FFT points interpolation'
+      if(nid.eq.0) write(6,*) 'done::FFT points interpolation'
 
       return
       end
@@ -249,31 +253,19 @@ C     fftw resources online.
       !Set up FFT plan parameters
       rank=nFFTorder !order of FFT 1d, 2d, 3d
 
-      !Sort nFFTd2t to make sure it is ordered lowest to highest
-      if (rank.gt.1) then
-        do i=1,rank-1
-            if(n(i).gt.nFFTd2t(i+1))then
-               swap=nFFTd2t(i+1)
-               nFFTd2t(i+1)=nFFTd2t(i)
-               nFFTd2t(i)=swap
-            end if
-        end do
-      end if
-
-
       ! 1-D FFT parameters----------------------------------------
       if(rank.eq.1)then
-        if(nFFTd2t(1).eq.1)then
+        if(bFFTd2t(1))then
            n(1)=nFFTlx1 !size of FFT
            istride=1  !distance between points in memory
            idist=nFFTlx1 !dist between first elements of different FFTs
            howmany=nFFTtotal/nFFTlx1*nFFTflds !total num FFTs
-         else if(nFFTd2t(1).eq.2) then
+         else if(bFFTd2t(2)) then
            n(1)=nFFTly1
            istride=nFFTlx1
            idist=1
            howmany=nFFTtotal/nFFTly1*nFFTflds
-         else if(if3d.and.nFFTd2t(1).eq.3) then
+         else if(if3d.and.bFFTd2t(3)) then
            n(1)=nFFTlz1
            istride=nFFTlx1*nFFTly1
            idist=1
@@ -283,10 +275,10 @@ C     fftw resources online.
          endif
       ! 2-D FFT parameters----------------------------------------
       else if(rank.eq.2)then
-        if(nFFTd2t(1).eq.1) then
+        if(bFFTd2t(1)) then
            n(1)=nFFTlx1
            istride=1
-           if(nFFTd2t(2).eq.2)then
+           if(bFFTd2t(2))then
            ! FFT in dimensions 1 and 2 of pts array
               n(2)=nFFTly1
               idist=nFFTlx1*nFFTly1
@@ -325,9 +317,9 @@ C     fftw resources online.
      $                              inembed,istride,idist,cFFTvals,
      $                              onembed,ostride,odist,FFTW_ESTIMATE)
 
-      if(nio.eq.0) write(6,*) 'done::FFT plan creation'
+      if(nid.eq.0) write(6,*) 'done::FFT plan creation'
       return
- 100  if(nid.eq.0) write(6,*) 'ERROR:: unsupported nFFTd2t entry'
+ 100  if(nid.eq.0) write(6,*) 'ERROR:: unsupported bFFTd2t entry'
       call exitt()
       return
       end
@@ -341,7 +333,7 @@ C     SUBROUTINE PERFORM FFT
 
       call dfftw_execute_(nFFTplan,rFFTvals,cFFTvals)
 
-      if(nio.eq.0) write(6,*) 'done::FFT transform'
+      if(nid.eq.0) write(6,*) 'done::FFT transform'
 
       return
       end
@@ -354,7 +346,7 @@ C     SUBROUTINE DESTROY FFT PLAN
       include 'MYFFT'
 
       call dfftw_destroy_plan_(nFFTplan)
-      if(nio.eq.0) write(6,*) 'done::FFT plan destroyed'
+      if(nid.eq.0) write(6,*) 'done::FFT plan destroyed'
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -393,6 +385,92 @@ C     SUBROUTINE PRINT FFT DATA TO TEXT FILE
        endif
        call nekgsync()
       end do
-      if(nio.eq.0) write(6,*) 'done::FFT results printed to file'
+      if(nid.eq.0) write(6,*) 'done::FFT results printed to file'
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+C     subroutine FFT_OFFSET
+C     Determines local to global array offset based on lexigraphical
+C     ordering i.e. x+y*nX+z*nX*nY
+C     Must use even number of processors divisible for 1d
+      subroutine FFT_OFFSET(nMyR,nXoff,nYoff,nZoff)
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+      !INPUT
+      integer nMyR
+      !OUTPUT
+      integer nXoff,nYoff,nZoff
+
+      nXoff=0
+      nYoff=0
+      nZoff=0
+
+      if(nFFTblX.gt.1) nXoff=mod(nMyR,nFFTbLX)
+      if(nFFTblY.gt.1.and.nFFTblX.gt.1) then
+          nYoff=nMyR/nFFTblX
+      else
+          if(nFFTblY.gt.1) nYoff=mod(nMyR,nFFTblY)
+      endif
+      if(nFFTblz.gt.1) nZoff=nMyR/(nFFTblX*nFFTblY)
+
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+C     SUBROUTINE FFT_OUTPUT_WAVENUMBERS()
+C     This subroutine is to output the data for each wave number in a
+C     seperate file.  Data is collected onto rank0 and written there
+      subroutine FFT_OUTPUT_WAVENUMBERS()
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+
+      integer,parameter::nInFFT=nFFTly1
+
+      !Define Size of array for wave number
+      real dataOutReal(nFFTflds,nFFTtotal/nInFFT)
+      real dataOutComp(nFFTflds,nFFTtotal/nInFFT)
+      real dataWork(nFFTflds,nFFTtotal/nInFFT)
+      !TODO determine parameters for size and nWaveOut
+      real dataOutPnts(3,nFFTtotal/nInFFT)
+      real dataWrkPnts(3,nFFTtotal/nInFFT)
+      !Define number of wave numbers to output
+      integer nWaveOut, nSZE, nOffX,nOffY, nOffZ
+
+      nWaveOut=nInFFT
+      nSZE=nFFTtotal/nInFFT
+      call FFT_OFFSET(nid,nOffX,nOffY,nOffZ)
+
+      !Loop over the wave numbers
+      do i=1,nWaveOut
+        !Zero out workign arrays
+        call rzero(dataOutReal,nSZE*nFFTflds)
+        call rzero(dataOutComp,nSZE*nFFTflds)
+        call rzero(dataWork,nSZE*nFFTflds)
+        call rzero(dataOutPnts,nSZE*ldim)
+        call rzero(dataWrkPnts,nSZE*ldim)
+        !populate local spot in the array
+        do j=1,nFFTlz1
+          do k=1,nFFTlx1
+            ii=(k-1+nOffX)+(j-1+nOffZ)*nFFTlx1+1
+            iii=1+(k-1)+(j-1)*nFFTlx1
+            do jj=1,ldim
+               dataOutPnts(jj,ii)=rFFTpts(jj,iii)
+            end do
+            if(ldim.ne.3) dataOutPnts(3,ii)=0.
+
+            do jj=1,nFFTflds
+               dataOutReal(jj,ii)=real(cFFTvals(jj,iii))
+               dataOutComp(jj,ii)=imag(cFFTvals(jj,iii))
+            end do
+
+          enddo
+        enddo
+        !gather procedure
+        call gop(dataOutPnts,dataWrkPnts,'+  ',3*nSZE)
+        call gop(dataOutReal,dataWork,'+  ',nSZE*nFFTflds)
+        call gop(dataOutComp,dataWork,'+  ',nSZE*nFFTflds)
+        !write data to file on rank0
+        !if(nid.eq.0) call WriteToVTS(nSZE,nFFTflds,dataOutPnts,dataOutReal)
+      end do
       return
       end

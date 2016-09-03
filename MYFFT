@@ -2,17 +2,32 @@ C**********************************************************************
 C   VARIABLES USED IN MYFFT ROUTINE
 C**********************************************************************
       include "fftw3.f" !lib with FFTW type definitions
+
+C*****BOOLEAN DATA****************************************
+      ! Variable names and definitions
+C----------------------------------------------------------------------
+    !Physical dimensions to perform FFT
+      logical bFFTd2t(3)
+C----------------------------------------------------------------------
+C----------User Input Start
+C DETERMINE WHICH DIRECTIONS YOU WANT TO TRANFORM HERE:
+      data bFFTd2t /.False.,.True.,.False./
+C----------User Input End
+
+
 C*****COMMON BLOCK FOR INTEGERS****************************************
       ! Variable names and definitions
 C----------------------------------------------------------------------
 C--------------Start user input for parameters
 C---------------------------------------------
     !Number of processors that will use FFT
-      integer, parameter::nFFTp2c=2                   
+      integer, parameter::nFFTp2c=2
+    !Number of blocks you domain is divided into in each direction
+      integer, parameter::nFFTblX=2,nFFTblY=1,nFFTblZ=1                   
     !Local sampling of field (any FFT dim must span global domain)
       integer, parameter::nFFTlx1=16,nFFTly1=16,nFFTlz1=1
     !Order of FFT (1d,2d,3d)=1,2,3
-      integer, parameter::nFFTorder=2
+      integer, parameter::nFFTorder=1
     !Number of fields to perform FFT on
       integer, parameter::nFFTflds=ldim+1+ldimt !plus 1 is for pressure
     !Total number of points in the local FFT domain
@@ -22,10 +37,10 @@ C---------------------------------------------
 C---------------------------------------------
 C---------------End user input for parameters 
 C---------------------------------------------     
-    !Physical dimensions to perform FFT
-      integer nFFTd2t(nFFTorder)
     !Parameter for error codes in findpnts
       integer nFFTrcode(nFFTtotal)
+    !Refernce for dimensions of FFT grid in vector form
+      integer nFFTdims(3)
     !Array for element id's where points exist
       integer nFFTelid(nFFTtotal)
     !Array for which processor the points are stored on
@@ -34,13 +49,9 @@ C---------------------------------------------
       integer nFFTitp_handle
     !FFT plan used by FFTW
       integer*8 nFFTplan                     
-      
-C----------------------------------------------------------------------
-C----------User Input Start
-C DETERMINE WHICH DIRECTIONS YOU WANT TO TRANFORM HERE:
-      data nFFTd2t /1,2/
-C----------User Input End
-      
+  
+      data nFFTdims /nFFTlx1,nFFTly1,nFFTlz1/    
+ 
       COMMON /INTMYFFT/ nFFTrcode,nFFTelid,nFFTproc, 
      $ nFFTitp_handle
       COMMON /INT8MYFFT/ nFFTplan 
