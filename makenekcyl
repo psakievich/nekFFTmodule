@@ -38,6 +38,8 @@ USR="psVtkOutput.o IntPtsFFT.o" # psVtkOutput.o"
 #VTK_LIB=
 #FFTW3_INC=
 #VTK_INC=
+#export VTK_INC
+#export NEKFFTSRC
 
 # linking flags
 USR_LFLAGS="-Wl,-rpath,$FFTW3_LIB  -L$FFTW3_LIB -lfftw3 -lm -lstdc++ -Wl,-rpath,$VTK_LIB -L$VTK_LIB -lvtkIOXML-7.0 -lvtkCommonDataModel-7.0 -lvtkCommonCore-7.0 -lvtkIOParallelXML-7.0"
