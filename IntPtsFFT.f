@@ -31,14 +31,14 @@ C     SUBROUTINE MYFFT
       include 'TOTAL'
       include 'MYFFT'
 
-
+      character*32 chFilename
       integer nFFTSetup  !variable to determine if setup has been called
       data nFFTSetup /0/ !initialize value to zero
       save nFFTSetup     !save value between subsequent calls
 
 
       ! 1) Make sure a valid number of processors are present
-      if(nFFTp2c>np) then
+      if(nFFTp2c.gt.np) then
          if(nid.eq.0)write(6,*),"ERROR FFT: FFTp2c> Total processors"
          call exitt()
       end if
@@ -46,15 +46,24 @@ C     SUBROUTINE MYFFT
       ! 2) Perform setup procedures
       if(nFFTSetup.eq.0) then
            call FFT_Define_Points()
-           call FFT_Find_Points()
+          ! call FFT_Find_Points()
       end if
+      !if(nFFTdmanual.ne.1.or.nFFTsetup.eq.0)then
+      !     call FFT_Create_Plan()
+      !endif
+      nFFTSetup=1
+      ! 3) Perform Interpolation
+           call FFT_Find_Points()
+          ! call FFT_Interp_Points()
       if(nFFTdmanual.ne.1.or.nFFTsetup.eq.0)then
            call FFT_Create_Plan()
       endif
-      nFFTSetup=1
-
-      ! 3) Perform Interpolation
-           call FFT_Interp_Points()
+      if(nid.lt.nFFTp2c)then
+      ! write(chFilename,"(A4)")"test"
+      ! call dwritevts(nid,nFFTdims,nFFTflds,rFFTpts,rFFTvals,chFilename)
+      endif
+      ! 3a) Convert velocity to cylindrical coordinates
+           call FFT_Cart2Cyl_Vel()
       ! 4) Perform Transform
            call FFT_Transform()
       ! 5) Destroy Plan
@@ -62,7 +71,9 @@ C     SUBROUTINE MYFFT
            call FFT_Destroy_Plan()
           end if
       ! 6) If desired write to file
-           call FFT_ASCII_PRINT()
+      !     call FFT_ASCII_PRINT()
+           call FFT_OUTPUT_WAVENUMBERS()
+           call FFT_ENERGY_REPORT()
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -78,19 +89,16 @@ C     FFT in the theta direction
       real PI
 
       integer i,j,k,ii
-      integer nOffX,nOffY,nOffZ
 
-      real dX, dY
+      real dR,dTheta,dZ,Rval,Tval,Zval,Xval,Yval
 
       PI=4.0*atan(1.0)
-      dX=2.0*PI/(nFFTlx1*nFFTblX)
-      dY=2.0*PI/(nFFTly1*nFFTblY)
-
-      !Determine local offset of points
-      call FFT_OFFSET(nid,nOffX,nOffY,nOffZ)
+      dR=3.15/(nFFTly1*nFFTbly-1)
+      dTheta=2.0*PI/(nFFTlx1*nFFTblx)
+      dZ=1.0/(nFFTlz1*nFFTblZ-1)
 
       ! Good idea to zero out any thing that won't be using an FFT
-      if(nid.gt.nFFTp2c) then
+      if(nid.ge.nFFTp2c) then
        do i=1,nFFTtotal
           rFFTpts(1,i)=0.0
           rFFTpts(2,i)=0.0
@@ -101,9 +109,13 @@ C     FFT in the theta direction
           do j=1,nFFTly1
              do k=1,nFFTlx1
                 ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
-                rFFTpts(1,ii)=dX*(k-1+nOffX)
-                rFFTpts(2,ii)=dY*(j-1+nOffY)
-                if(if3d) rFFTpts(3,ii)=dZ*(i-1+nOffZ)
+                Rval=dR*(j-1+mod(nid,nFFTblY)*nFFTly1)
+                Tval=dTheta*(k-1)
+                Zval=-0.5+dZ*(i-1+(nid/nFFTblY)*nFFTlz1)
+
+                rFFTpts(1,ii)=Rval*cos(Tval)
+                rFFTpts(2,ii)=Rval*sin(Tval)
+                rFFTpts(3,ii)=ZVal
 
              end do
           end do
@@ -125,35 +137,38 @@ C     DO NOT confuse rFFTvals and cFFTvals
       include 'TOTAL'
       include 'MYFFT'
       common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
-      integer nxyz, nflds
+      integer nxyz, nflds, iCalled
       integer ntot
+      save iCalled
+      data iCalled/0/
 
       nxyz=nx1*ny1*nz1
       ntot=nxyz*nelt
 
       nFFTitp_handle=0
+      nFlds=0 
       !Map pressure to grid1
       call prepost_map(0)
 
       !Perform setup on first call
-      call intpts_setup(-1.0,nFFTitp_handle)
+      if(iCalled.eq.0)call intpts_setup(-1.0,nFFTitp_handle)
 
       ! pack working array
       if(ifvo) then
-        call copy(rFFTwrk(1,ndim),vx,ntot)
-        call copy(rFFTwrk(1,ndim),vy,ntot)
-        if(if3d) call copy(rFFTwrk(1,ndim),vz,ntot)
+        call copy(rFFTwrk(1,1),vx,ntot)
+        call copy(rFFTwrk(1,2),vy,ntot)
+        if(if3d) call copy(rFFTwrk(1,3),vz,ntot)
         nflds = ndim
       endif
 
       if(ifpo) then
         nflds = nflds + 1
-        call copy(rFFTwrk(1,nFFTflds),pm1,ntot)
+        call copy(rFFTwrk(1,nflds),pm1,ntot)
       endif
 
       if(ifto) then
         nflds = nflds + 1
-        call copy(rFFTwrk(1,nFFTflds),t,ntot)
+        call copy(rFFTwrk(1,nflds),t,ntot)
       endif
 
       do i = 1,ldimt
@@ -164,6 +179,7 @@ C     DO NOT confuse rFFTvals and cFFTvals
       enddo
 
       !find points
+      if(icalled.eq.0)then
       call findpts(nFFTitp_handle,nFFTrcode,1,
      &                 nFFTproc,1,
      &                 nFFTelid,1,
@@ -189,27 +205,28 @@ C     DO NOT confuse rFFTvals and cFFTvals
      &        (rFFTpts(k,i),k=1,ndim)
            endif
         enddo
-
+       icalled=1
+      endif
       !Map pressure back to grid2
-      call prepost_map(1)
+      !call prepost_map(1)
 
       if(nid.eq.0) write(6,*) 'done::FFT points found'
 
-      return
-      end
+      !return
+      !end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FFT INTERP POINTS
 C     This is the routine where the actual interpolation takes place
-      subroutine FFT_INTERP_POINTS()
+      !subroutine FFT_INTERP_POINTS()
 
-      include 'SIZE'
-      include 'TOTAL'
-      include 'MYFFT'
+      !include 'SIZE'
+      !include 'TOTAL'
+      !include 'MYFFT'
 
-      common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
+      !common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
 
       !Map pressure to grid1
-      call prepost_map(0)
+      !call prepost_map(0)
 
       !evaluate field at given points
       do ifld = 1,nFFTflds
@@ -219,6 +236,9 @@ C     This is the routine where the actual interpolation takes place
      &                     nFFTelid,1,
      &                     rFFTrst,ndim,nFFTtotal,
      &                     rFFTwrk(1,ifld))
+         do j=1,nFFTtotal
+            cFFTvals(j,ifld)=DCMPLX(rFFTvals(ifld,j),0.d0)
+         end do
       enddo
 
       !Map pressure back to grid2
@@ -242,13 +262,13 @@ C     fftw resources online.
       ! it requires the following parameters:
 
       integer rank,n(nFFTorder),howmany, idist, odist, istride, ostride,
-     $  inembed(nFFTorder), enembed(nFFTorder), swap
+     $  inembed(nFFTorder), onembed(nFFTorder), swap
 
       !This shares the memory for n and the embedding.  My routine
       !does not function with embedded FFT for padding etc. If you need
       !embedding you will need to modify this routine
       equivalence (n,inembed)
-      equivalence (n,enembed)
+      equivalence (n,onembed)
 
       !Set up FFT plan parameters
       rank=nFFTorder !order of FFT 1d, 2d, 3d
@@ -265,57 +285,36 @@ C     fftw resources online.
            istride=nFFTlx1
            idist=1
            howmany=nFFTtotal/nFFTly1*nFFTflds
-         else if(if3d.and.bFFTd2t(3)) then
+         else if(bFFTd2t(3)) then
            n(1)=nFFTlz1
            istride=nFFTlx1*nFFTly1
-           idist=1
+           idist=nFFTtotal
            howmany=nFFTtotal/nFFTlz1*nFFTflds
          else
            go to 100
          endif
-      ! 2-D FFT parameters----------------------------------------
-      else if(rank.eq.2)then
-        if(bFFTd2t(1)) then
-           n(1)=nFFTlx1
-           istride=1
-           if(bFFTd2t(2))then
-           ! FFT in dimensions 1 and 2 of pts array
-              n(2)=nFFTly1
-              idist=nFFTlx1*nFFTly1
-              howmany=nFFTlz1*nFFTflds
-           else
-           ! FFT in dimensions 1 and 3 of pts array
-           ! currently not sure how this would work since
-           ! it would require 2 different strides. Therefore,
-           ! I choose not to support it
-              go to 100
-           endif
-        else
-        ! FFT in dimensions 2 and 3 of pts array
-          n(1)=nFFTly1
-          n(2)=nFFTlz1
-          idist=1
-          istride=nFFTlx1
-          howmany=nFFTlx1*nFFTflds
-        endif
-      else if (rank.eq.3)then
-      ! 3-D FFT parameters----------------------------------------
-        n(1)=nFFTlx1
-        n(2)=nFFTly1
-        n(3)=nFFTlz1
-        idist=1
-        istride=1
-        howmany=nFFTflds
       else
         go to 100
       end if
-
+      
       ostride=istride
       odist=idist
-
-      call dfftw_plan_many_dft_r2c(nFFTplan,rank,n,howmany,rFFTvals,
+      if(nid.eq.0)then
+        write(6,*)"FFT rank:",rank 
+        write(6,*)"FFT n:",n 
+        write(6,*)"FFT howmany:",howmany 
+        write(6,*)"FFT inembed:",inembed 
+        write(6,*)"FFT istride:",istride 
+        write(6,*)"FFT idist:",idist 
+        write(6,*)"FFT onembed:",onembed 
+        write(6,*)"FFT ostride:",ostride 
+        write(6,*)"FFT odist:",odist 
+       ! write(6,*)"FFT rVals:",rFFTvals
+      endif
+      call dfftw_plan_many_dft(nFFTplan,rank,n,howmany,cFFTvals,
      $                              inembed,istride,idist,cFFTvals,
-     $                              onembed,ostride,odist,FFTW_ESTIMATE)
+     $                              onembed,ostride,odist,
+     $                              FFTW_FORWARD,FFTW_ESTIMATE)
 
       if(nid.eq.0) write(6,*) 'done::FFT plan creation'
       return
@@ -331,8 +330,7 @@ C     SUBROUTINE PERFORM FFT
       include 'TOTAL'
       include 'MYFFT'
 
-      call dfftw_execute_(nFFTplan,rFFTvals,cFFTvals)
-
+      call dfftw_execute_dft(nFFTplan,cFFTvals,cFFTvals)
       if(nid.eq.0) write(6,*) 'done::FFT transform'
 
       return
@@ -345,7 +343,7 @@ C     SUBROUTINE DESTROY FFT PLAN
       include 'TOTAL'
       include 'MYFFT'
 
-      call dfftw_destroy_plan_(nFFTplan)
+      call dfftw_destroy_plan(nFFTplan)
       if(nid.eq.0) write(6,*) 'done::FFT plan destroyed'
       return
       end
@@ -377,8 +375,8 @@ C     SUBROUTINE PRINT FFT DATA TO TEXT FILE
          end if
 
          do j=1,nFFTtotal
-           write(10,*) (rFFTpts(ii,j),ii=1,ldim),(cFFTvals(ii,j),
-     $     ii=1,nFFTflds)
+           write(10,*) nid,GetAngle(rFFTpts(1,j),rFFTpts(2,j)),
+     $                        (real(cFFTvals(j,ii)),ii=5,5)
          end do
 
          close(unit=10)
@@ -424,53 +422,149 @@ C     seperate file.  Data is collected onto rank0 and written there
       include 'TOTAL'
       include 'MYFFT'
 
-      integer,parameter::nInFFT=nFFTly1
+      integer,parameter::nInFFT=nFFTlx1
+      integer,parameter::nInSlice=nFFTly1*nFFTbly*nFFTlz1*nFFTblZ
+      integer,parameter::nGx=nFFTly1*nFFTblY
+      integer,parameter::nGZ=nFFTlz1*nFFTblZ
 
       !Define Size of array for wave number
-      real dataOutReal(nFFTflds,nFFTtotal/nInFFT)
-      real dataOutComp(nFFTflds,nFFTtotal/nInFFT)
-      real dataWork(nFFTflds,nFFTtotal/nInFFT)
-      !TODO determine parameters for size and nWaveOut
-      real dataOutPnts(3,nFFTtotal/nInFFT)
-      real dataWrkPnts(3,nFFTtotal/nInFFT)
+      real dataOutReal(nFFTflds,nInSlice)
+      real dataOutComp(nFFTflds,nInSlice)
+      real dataWork(nFFTflds,nInSlice)
+      !TODO determine parameters for size
+      real dataOutPts(3,nInSlice)
+      real dataWrkPts(3,nInSlice)
+      real theta
       !Define number of wave numbers to output
-      integer nWaveOut, nSZE, nOffX,nOffY, nOffZ
+      integer nMyWave,nFFToutstep
+      integer,dimension(3):: nDimension
+      character*32 chFileName
+      save nFFToutstep
+      data nFFToutstep /0/
 
-      nWaveOut=nInFFT
-      nSZE=nFFTtotal/nInFFT
-      call FFT_OFFSET(nid,nOffX,nOffY,nOffZ)
-
+      data nDimension /nGx,1,nGz/
       !Loop over the wave numbers
-      do i=1,nWaveOut
+      do i=1,1024
         !Zero out workign arrays
-        call rzero(dataOutReal,nSZE*nFFTflds)
-        call rzero(dataOutComp,nSZE*nFFTflds)
-        call rzero(dataWork,nSZE*nFFTflds)
-        call rzero(dataOutPnts,nSZE*ldim)
-        call rzero(dataWrkPnts,nSZE*ldim)
+        call rzero(dataOutReal,nInSlice*nFFTflds)
+        call rzero(dataOutComp,nInSlice*nFFTflds)
+        call rzero(dataWork,nInSlice*nFFTflds)
+        call rzero(dataOutPts,nInSlice*3)
+        call rzero(dataWrkPts,nInSlice*3)
         !populate local spot in the array
+        if(nid.lt.nFFTp2c)then
         do j=1,nFFTlz1
-          do k=1,nFFTlx1
-            ii=(k-1+nOffX)+(j-1+nOffZ)*nFFTlx1+1
-            iii=1+(k-1)+(j-1)*nFFTlx1
-            do jj=1,ldim
-               dataOutPnts(jj,ii)=rFFTpts(jj,iii)
-            end do
-            if(ldim.ne.3) dataOutPnts(3,ii)=0.
+          do k=1,nFFTly1
+            kg=(k)+mod(nid,nFFTblY)*nFFTly1 
+            jg=(j)+(nid/nFFTblY)*nFFTlz1
+            iii=(i)+(k-1)*nFFTlx1+(j-1)*nFFTlx1*nFFTly1
+            ii=(kg)+(jg-1)*nFFTly1*nFFTbly 
+         !   if(nid.eq.1) write(6,*) i,j,k,ii,iii,"INDEX"
+            if(i.lt.nInFFT/2)then
+               nMyWave=i-1
+            else
+               nMyWave=nInFFT-i
+            endif
+            theta=GetAngle(rFFTpts(1,iii),rFFTpts(2,iii))
+            !Convert to cylindrical coordinates
+            dataOutPts(1,ii)=sqrt(rFFTpts(1,iii)**2+rFFTpts(2,iii)**2)
+            dataOutPts(2,ii)=0.d0
+            dataOutPts(3,ii)=rFFTpts(3,iii)
 
             do jj=1,nFFTflds
-               dataOutReal(jj,ii)=real(cFFTvals(jj,iii))
-               dataOutComp(jj,ii)=imag(cFFTvals(jj,iii))
+               dataOutReal(jj,ii)=real(cFFTvals(iii,jj))/dble(nInFFT)
+               dataOutComp(jj,ii)=dimag(cFFTvals(iii,jj))/dble(nInFFT)
             end do
 
           enddo
         enddo
+        endif
         !gather procedure
-        call gop(dataOutPnts,dataWrkPnts,'+  ',3*nSZE)
-        call gop(dataOutReal,dataWork,'+  ',nSZE*nFFTflds)
-        call gop(dataOutComp,dataWork,'+  ',nSZE*nFFTflds)
+        call gop(dataOutPts,dataWrkPts,'+  ',3*nInSlice)
+        call gop(dataOutReal,dataWork,'+  ',nInSlice*nFFTflds)
+        call gop(dataOutComp,dataWork,'+  ',nInSlice*nFFTflds)
         !write data to file on rank0
-        !if(nid.eq.0) call WriteToVTS(nSZE,nFFTflds,dataOutPnts,dataOutReal)
+         write(chFileName,"('./Snaps/',I0,'/SymS1_',I0,'_TSTEP')")
+     $                         i-1,nMyWave
+        if(nid.eq.0) call dwritevtsc(nFFToutstep,nDimension,nFFTflds,
+     $     dataOutPts,
+     $                    dataOutReal,dataOutComp,chFileName)
       end do
+      nFFToutstep=nFFToutstep+1
       return
       end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      subroutine FFT_Cart2Cyl_Vel()
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+      
+      real locTheta,velX,velY
+      
+      do i=1,nFFTtotal
+         velX=cFFTvals(i,1)
+         velY=cFFTvals(i,2)
+             locTheta=getangle(rFFTpts(1,i),rFFTpts(2,i))
+         cFFTvals(i,1)=velX*cos(locTheta)+velY*sin(locTheta)
+         cFFTvals(i,2)=-velX*sin(locTheta)+velY*cos(locTheta)
+      end do
+  
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function GetAngle(x,y)
+      real x,y
+         if(x.gt.0.0)then
+            GetAngle=atan(y/x)
+         else
+            if(x.lt.0.0)then
+              GetAngle=atan(y/x)+4.0*atan(1.0)
+            else
+               if(y.ge.0.0)then
+                  GetAngle=2.0*atan(1.0)
+               else
+                  GetAngle=-2.0*atan(1.0)
+               end if
+            endif
+         endif
+      return 
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      subroutine FFT_ENERGY_REPORT()
+      include 'SIZE'
+      include 'TOTAL'
+      include 'MYFFT'
+      real EnergyWave(nFFTflds,nFFTlx1),EnergyWork(nFFTflds,nFFTlx1)
+      real radius
+      integer nFFToutstep
+      character*80 fileName
+      save nFFToutstep
+      data nFFToutstep /0/
+      call rzero(EnergyWave,nFFTflds*nFFTlx1)
+      do i=0,nFFTlz1*nFFTly1-1
+        do j=1,nFFTlx1
+           do k=1,nFFTflds
+              radius=sqrt(rFFTpts(1,j+i*nFFTlx1)**2+
+     $             rFFTpts(2,j+i*nFFTlx1)**2)
+              EnergyWave(k,j)=EnergyWave(k,j)+
+     $         real(dconjg(cFFTvals(j+i*nFFTlx1,k)/dble(nFFTlx1))
+     $               *(cFFTvals(j+i*nFFTlx1,k)/dble(nFFTlx1)))
+     $               *radius
+           end do
+        end do
+      end do
+      call gop(EnergyWave,EnergyWork,'+  ',nFFTflds*nFFTlx1)
+
+      write(fileName,"('./Snaps/EnergyReport_',I0,'.dat')")nFFToutstep
+      if(nid.eq.0)then
+        open(unit=10,file=fileName,status='REPLACE')
+        do i =1,nFFTlx1/2
+          write(10,*)i-1,(EnergyWave(k,i),k=1,nFFTflds)
+        end do
+        do i =nFFTlx1/2+1,nFFTlx1
+          write(10,*)i-(nFFTlx1+1),(EnergyWave(k,i),k=1,nFFTflds)
+        end do
+        close(unit=10) 
+      end if
+      nFFToutstep=nFFToutstep+1
+      end 

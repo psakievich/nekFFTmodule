@@ -11,7 +11,7 @@ C----------------------------------------------------------------------
 C----------------------------------------------------------------------
 C----------User Input Start
 C DETERMINE WHICH DIRECTIONS YOU WANT TO TRANFORM HERE:
-      data bFFTd2t /.False.,.True.,.False./
+      data bFFTd2t /.True.,.False.,.False./
 C----------User Input End
 
 
@@ -21,11 +21,11 @@ C----------------------------------------------------------------------
 C--------------Start user input for parameters
 C---------------------------------------------
     !Number of processors that will use FFT
-      integer, parameter::nFFTp2c=2
+      integer, parameter::nFFTp2c=2048
     !Number of blocks you domain is divided into in each direction
-      integer, parameter::nFFTblX=2,nFFTblY=1,nFFTblZ=1                   
+      integer, parameter::nFFTblX=1,nFFTblY=32,nFFTblZ=nFFTp2c/nFFTbly                   
     !Local sampling of field (any FFT dim must span global domain)
-      integer, parameter::nFFTlx1=16,nFFTly1=16,nFFTlz1=1
+      integer, parameter::nFFTlx1=2048,nFFTly1=5,nFFTlz1=1
     !Order of FFT (1d,2d,3d)=1,2,3
       integer, parameter::nFFTorder=1
     !Number of fields to perform FFT on
@@ -33,7 +33,7 @@ C---------------------------------------------
     !Total number of points in the local FFT domain
       integer, parameter::nFFTtotal=nFFTlx1*nFFTly1*nFFTlz1
     !Destroy fftw plan manually (1) or automatically (anything else)
-      integer, parameter::nFFTdmanual=1
+      integer, parameter::nFFTdmanual=0
 C---------------------------------------------
 C---------------End user input for parameters 
 C---------------------------------------------     
@@ -49,8 +49,6 @@ C---------------------------------------------
       integer nFFTitp_handle
     !FFT plan used by FFTW
       integer*8 nFFTplan                     
-  
-      data nFFTdims /nFFTlx1,nFFTly1,nFFTlz1/    
  
       COMMON /INTMYFFT/ nFFTrcode,nFFTelid,nFFTproc, 
      $ nFFTitp_handle
@@ -79,7 +77,9 @@ C----------------------------------------------------------------------
 C*****COMMON BLOCK FOR COMPLEX*****************************************
       ! Variable names and definitions    
 C----------------------------------------------------------------------
-      double complex cFFTvals(nFFTflds,nFFTtotal)
+      double complex cFFTvals(nFFTtotal,nFFTflds)
+C      complex(8) cFFTvals(nFFTtotal,nFFTflds)
 C----------------------------------------------------------------------
       COMMON /COMPMYFFT/ cFFTvals
 C----------------------------------------------------------------------
+      data nFFTdims /nFFTlx1,nFFTly1,nFFTlz1/    
