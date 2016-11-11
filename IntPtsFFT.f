@@ -33,8 +33,9 @@ C     SUBROUTINE MYFFT
 
       character*32 chFilename
       integer nFFTSetup  !variable to determine if setup has been called
-      data nFFTSetup /0/ !initialize value to zero
-      save nFFTSetup     !save value between subsequent calls
+      integer nFFToutstep
+      data nFFTSetup,nFFToutstep /0,0/ !initialize value to zero
+      save nFFTSetup,nFFToutstep     !save value between subsequent calls
 
 
       ! 1) Make sure a valid number of processors are present
@@ -59,8 +60,8 @@ C     SUBROUTINE MYFFT
            call FFT_Create_Plan()
       endif
       if(nid.lt.nFFTp2c)then
-      ! write(chFilename,"(A4)")"test"
-      ! call dwritevts(nid,nFFTdims,nFFTflds,rFFTpts,rFFTvals,chFilename)
+       write(chFilename,"(A4)")"test"
+       call dwritevts(nid,nFFTdims,nFFTflds,rFFTpts,rFFTvals,chFilename)
       endif
       ! 3a) Convert velocity to cylindrical coordinates
            call FFT_Cart2Cyl_Vel()
@@ -72,8 +73,9 @@ C     SUBROUTINE MYFFT
           end if
       ! 6) If desired write to file
       !     call FFT_ASCII_PRINT()
-           call FFT_OUTPUT_WAVENUMBERS()
-           call FFT_ENERGY_REPORT()
+           call FFT_OUTPUT_WAVENUMBERS(nFFToutstep)
+           call FFT_ENERGY_REPORT(nFFToutstep)
+      nFFToutstep=nFFToutstep+1
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -85,17 +87,28 @@ C     FFT in the theta direction
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-
+      common /myDomainRange/rMax,zMax,zMin,nGx1,nGy1,nGz1
       real PI
 
-      integer i,j,k,ii
-
+      integer i,j,k,ii,ntot
+      integer iG,jG,kG,nGx1,nGy1,nGz1
       real dR,dTheta,dZ,Rval,Tval,Zval,Xval,Yval
+      real rMax,zMax,zMin
+      nGx1=nFFTlx1*nFFTblx
+      nGy1=nFFTly1*nFFTbly
+      nGz1=nFFTlz1*nFFTblz
 
+      ntot=lx1*ly1*lz1*lelv
+      zMax=glmax(zm1,ntot)
+      zMin=glmin(zm1,ntot)
+      rMax=glmax(xm1,ntot)
+      if(nid.eq.0)write(6,*)nGx1,nGy1,nGz1
+      if(nid.eq.0)write(6,*)zMin,zMax,rMax
       PI=4.0*atan(1.0)
-      dR=3.15/(nFFTly1*nFFTbly-1)
+
+C      dR=xMax/(nFFTly1*nFFTbly-1)
       dTheta=2.0*PI/(nFFTlx1*nFFTblx)
-      dZ=1.0/(nFFTlz1*nFFTblZ-1)
+C      dZ=1.0/(nFFTlz1*nFFTblZ-1)
 
       ! Good idea to zero out any thing that won't be using an FFT
       if(nid.ge.nFFTp2c) then
@@ -109,9 +122,11 @@ C     FFT in the theta direction
           do j=1,nFFTly1
              do k=1,nFFTlx1
                 ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
-                Rval=dR*(j-1+mod(nid,nFFTblY)*nFFTly1)
+                call FFT_L2G(i,j,k,iG,jG,kG,nid)
+                
+                Rval=rMax*(0.5*CGL_Point(nGy1,jG-1)+0.5)
                 Tval=dTheta*(k-1)
-                Zval=-0.5+dZ*(i-1+(nid/nFFTblY)*nFFTlz1)
+                Zval=zMin+(zMax-zMin)*(0.5*CGL_Point(nGz1,iG-1)+0.5)
 
                 rFFTpts(1,ii)=Rval*cos(Tval)
                 rFFTpts(2,ii)=Rval*sin(Tval)
@@ -417,7 +432,7 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FFT_OUTPUT_WAVENUMBERS()
 C     This subroutine is to output the data for each wave number in a
 C     seperate file.  Data is collected onto rank0 and written there
-      subroutine FFT_OUTPUT_WAVENUMBERS()
+      subroutine FFT_OUTPUT_WAVENUMBERS(nFFToutstep)
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
@@ -439,12 +454,10 @@ C     seperate file.  Data is collected onto rank0 and written there
       integer nMyWave,nFFToutstep
       integer,dimension(3):: nDimension
       character*32 chFileName
-      save nFFToutstep
-      data nFFToutstep /0/
 
       data nDimension /nGx,1,nGz/
       !Loop over the wave numbers
-      do i=1,1024
+      do i=1,16
         !Zero out workign arrays
         call rzero(dataOutReal,nInSlice*nFFTflds)
         call rzero(dataOutComp,nInSlice*nFFTflds)
@@ -484,13 +497,12 @@ C     seperate file.  Data is collected onto rank0 and written there
         call gop(dataOutReal,dataWork,'+  ',nInSlice*nFFTflds)
         call gop(dataOutComp,dataWork,'+  ',nInSlice*nFFTflds)
         !write data to file on rank0
-         write(chFileName,"('./Snaps/',I0,'/SymS1_',I0,'_TSTEP')")
-     $                         i-1,nMyWave
+         write(chFileName,"('WAVE_',I0,'_TSTEP')")
+     $                         nMyWave
         if(nid.eq.0) call dwritevtsc(nFFToutstep,nDimension,nFFTflds,
      $     dataOutPts,
      $                    dataOutReal,dataOutComp,chFileName)
       end do
-      nFFToutstep=nFFToutstep+1
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -530,32 +542,41 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       return 
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      subroutine FFT_ENERGY_REPORT()
+      subroutine FFT_ENERGY_REPORT(nFFToutstep)
+C     OUTPUT THE ENERGY FOR EACH WAVE NUMBER INEGRATED OVER THE R-Z
+C     PLANE USEING NUMERICAL INTEGRATION VIA CGL-QUADRATURE
+C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
+      common /myDomainRange/rMax,zMax,zMin,nGx1,nGy1,nGz1
       real EnergyWave(nFFTflds,nFFTlx1),EnergyWork(nFFTflds,nFFTlx1)
       real radius
-      integer nFFToutstep
+      integer nFFToutstep,ii,iii,iG,jG,kG
       character*80 fileName
-      save nFFToutstep
-      data nFFToutstep /0/
       call rzero(EnergyWave,nFFTflds*nFFTlx1)
-      do i=0,nFFTlz1*nFFTly1-1
+      do i=1,nFFTlz1
+      do ii=1,nFFTly1
         do j=1,nFFTlx1
            do k=1,nFFTflds
-              radius=sqrt(rFFTpts(1,j+i*nFFTlx1)**2+
-     $             rFFTpts(2,j+i*nFFTlx1)**2)
+              call FFT_L2G(i,ii,j,iG,jG,kG,nid)
+              iii=(ii-1)+(i-1)*nFFTly1
+              radius=sqrt(rFFTpts(1,j+iii*nFFTlx1)**2+
+     $             rFFTpts(2,j+iii*nFFTlx1)**2)
+
+C             Ek=sum_z sum_r phi(r,z)*CC[phi(r,z)] *wr*R/2*wz*H/2
               EnergyWave(k,j)=EnergyWave(k,j)+
-     $         real(dconjg(cFFTvals(j+i*nFFTlx1,k)/dble(nFFTlx1))
-     $               *(cFFTvals(j+i*nFFTlx1,k)/dble(nFFTlx1)))
-     $               *radius
+     $         real(dconjg(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1))
+     $               *(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1)))
+     $               *radius*CGL_Weight(nGy1,jG)*CGL_Weight(nGz1,iG)
+     $               *0.25*rMax*(zMax-zMin)
            end do
         end do
       end do
+      end do
       call gop(EnergyWave,EnergyWork,'+  ',nFFTflds*nFFTlx1)
 
-      write(fileName,"('./Snaps/EnergyReport_',I0,'.dat')")nFFToutstep
+      write(fileName,"('EnergyReport_',I0,'.dat')")nFFToutstep
       if(nid.eq.0)then
         open(unit=10,file=fileName,status='REPLACE')
         do i =1,nFFTlx1/2
@@ -566,5 +587,44 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         end do
         close(unit=10) 
       end if
-      nFFToutstep=nFFToutstep+1
+      return
       end 
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      subroutine FFT_L2G(iL,jL,kL,iG,jG,kG,me)
+C     MAP LOCAL INDEX IN GRID TO GLOBAL INDEX
+C     K-Innermost loop corresponding to nFFTlx1
+C     J-Middle loop corresponding to nFFTly1
+C     I-Outermost loop corresponding to nFFTlz1
+C     me-mpi rank
+      include 'SIZE'
+      include 'MYFFT'
+      integer iL,jL,kL,iG,jG,kG,me
+c      write(6,*)'INSIDE FFT_L2G',nFFTbly,me
+c      write(6,*) iL,jL,kL,iG,jG,kG,me
+      iG=iL+(me/nFFTblY)*nFFTlz1
+      jG=jL+mod(me,nFFTblY)*nFFTly1
+      kG=kL
+c      write(6,*) iL,jL,kL,iG,jG,kG,me
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function CGL_POINT(N,I)
+C     Chebyshev-Gauss-Lobatto quadrature point
+      !N is total number of points
+      !I is current point in series
+      integer N,I
+      CGL_POINT=-cos(4.0*atan(1.0)*dble(I)/dble(N-1))
+      return      
+      end 
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function CGL_WEIGHT(N,I)
+C     Chebyshev-Gauss-Lobatto quadrature weight
+      integer N,I
+      if(I.eq.0.or.I.eq.N-1)then
+        CGL_WEIGHT=4.0*atan(1.0)*0.5/dble(N-1)
+      else
+        CGL_WEIGHT=4.0*atan(1.0)/dble(N-1)
+      end if
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

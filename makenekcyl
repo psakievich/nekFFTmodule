@@ -33,13 +33,16 @@ CC="mpicc"
 #       a makefile_usr.inc has to be provided containing the build rules 
 USR="psVtkOutput.o IntPtsFFT.o" # psVtkOutput.o"
 #DEFINE THESE FOR LIBRARY LINKING IF NOT ALREADY DEFINED
-#NEKFFTSRC=
-#FFTW3_LIB=
-#VTK_LIB=
-#FFTW3_INC=
-#VTK_INC=
-#export VTK_INC
-#export NEKFFTSRC
+NEKFFTSRC="$SOURCE_ROOT/nekFFTmodule"
+FFTW3_LIB="$HOME/soft/lib"
+VTK_LIB="$FFTW3_LIB"
+FFTW3_INC="$HOME/soft/include"
+VTK_INC="$HOME/soft/include/vtk-7.0"
+export NEKFFTSRC
+export VTK_INC
+#COPY FILES WHERE NECESSARY
+python $NEKFFTSRC/IfDoesNotExistCopy.py 'MYFFT' $NEKFFTSRC
+python $NEKFFTSRC/IfDoesNotExistCopy.py 'IntPtsFFT.f' $NEKFFTSRC
 
 # linking flags
 USR_LFLAGS="-Wl,-rpath,$FFTW3_LIB  -L$FFTW3_LIB -lfftw3 -lm -lstdc++ -Wl,-rpath,$VTK_LIB -L$VTK_LIB -lvtkIOXML-7.0 -lvtkCommonDataModel-7.0 -lvtkCommonCore-7.0 -lvtkIOParallelXML-7.0"
