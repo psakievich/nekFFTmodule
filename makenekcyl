@@ -40,10 +40,10 @@ FFTW3_INC="$HOME/soft/include"
 VTK_INC="$HOME/soft/include/vtk-7.0"
 export NEKFFTSRC
 export VTK_INC
-#COPY FILES WHERE NECESSARY
+#COPY FILES FROM GIT REPO WHERE NECESSARY
 python $NEKFFTSRC/IfDoesNotExistCopy.py 'MYFFT' $NEKFFTSRC
 python $NEKFFTSRC/IfDoesNotExistCopy.py 'IntPtsFFT.f' $NEKFFTSRC
-
+python $NEKFFTSRC/IfDoesNotExistCopy.py 'PathCreation.py' $NEKFFTSRC
 # linking flags
 USR_LFLAGS="-Wl,-rpath,$FFTW3_LIB  -L$FFTW3_LIB -lfftw3 -lm -lstdc++ -Wl,-rpath,$VTK_LIB -L$VTK_LIB -lvtkIOXML-7.0 -lvtkCommonDataModel-7.0 -lvtkCommonCore-7.0 -lvtkIOParallelXML-7.0"
 
