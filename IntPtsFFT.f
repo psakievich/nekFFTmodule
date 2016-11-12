@@ -124,9 +124,9 @@ C      dZ=1.0/(nFFTlz1*nFFTblZ-1)
                 ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
                 call FFT_L2G(i,j,k,iG,jG,kG,nid)
                 
-                Rval=rMax*(0.5*CGL_Point(nGy1,jG-1)+0.5)
+                Rval=rMax*(0.5*QuadPnt(nGy1,jG)+0.5)
                 Tval=dTheta*(k-1)
-                Zval=zMin+(zMax-zMin)*(0.5*CGL_Point(nGz1,iG-1)+0.5)
+                Zval=zMin+(zMax-zMin)*(0.5*QuadPnt(nGz1,iG)+0.5)
 
                 rFFTpts(1,ii)=Rval*cos(Tval)
                 rFFTpts(2,ii)=Rval*sin(Tval)
@@ -544,7 +544,7 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       subroutine FFT_ENERGY_REPORT(nFFToutstep)
 C     OUTPUT THE ENERGY FOR EACH WAVE NUMBER INEGRATED OVER THE R-Z
-C     PLANE USEING NUMERICAL INTEGRATION VIA CGL-QUADRATURE
+C     PLANE USEING NUMERICAL INTEGRATION
 C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
       include 'SIZE'
       include 'TOTAL'
@@ -565,10 +565,11 @@ C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
      $             rFFTpts(2,j+iii*nFFTlx1)**2)
 
 C             Ek=sum_z sum_r phi(r,z)*CC[phi(r,z)] *wr*R/2*wz*H/2
+C             Divide by nFFTlx1 to normalize the Fourier Coefficient
               EnergyWave(k,j)=EnergyWave(k,j)+
      $         real(dconjg(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1))
      $               *(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1)))
-     $               *radius*CGL_Weight(nGy1,jG)*CGL_Weight(nGz1,iG)
+     $               *radius*QuadWgt(nGy1,jG)*QuadWgt(nGz1,iG)
      $               *0.25*rMax*(zMax-zMin)
            end do
         end do
@@ -610,21 +611,51 @@ c      write(6,*) iL,jL,kL,iG,jG,kG,me
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       real function CGL_POINT(N,I)
 C     Chebyshev-Gauss-Lobatto quadrature point
-      !N is total number of points
-      !I is current point in series
+      !N is total number of points (N-1 polynomial)
+      !I is current point in series from 1:N
       integer N,I
-      CGL_POINT=-cos(4.0*atan(1.0)*dble(I)/dble(N-1))
+      CGL_POINT=-cos(4.0*atan(1.0)*dble(I-1)/dble(N-1))
       return      
       end 
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       real function CGL_WEIGHT(N,I)
 C     Chebyshev-Gauss-Lobatto quadrature weight
+C     i from 1:N
       integer N,I
-      if(I.eq.0.or.I.eq.N-1)then
+      if(I.eq.1.or.I.eq.N)then
         CGL_WEIGHT=4.0*atan(1.0)*0.5/dble(N-1)
       else
         CGL_WEIGHT=4.0*atan(1.0)/dble(N-1)
       end if
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function CG_POINT(N,I)
+C     Chebyshev-Gauss quadrature point
+C     i from 1:N
+      integer N,I
+      PI=4.0*atan(1.0)
+      CG_POINT=-cos((2.0*i-1)*PI/(2.0*dble(N)))
+      return
+      end 
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function CG_WEIGHT(N)
+      integer N
+      CG_WEIGHT=4.0*atan(1.0)/dble(N)
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function QuadPnt(N,I)
+      integer N,I
+      QuadPnt=GL_POINT(N,I)
+      !QuadPnt=CGL_POINT(N,I)
+      return
+      end
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      real function QuadWgt(N,I)
+      integer N,I
+      QuadWgt=GL_Weight(N)
+      !QuadWgt=CGL_Weight(N,I)
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
