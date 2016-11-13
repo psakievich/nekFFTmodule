@@ -627,6 +627,7 @@ C     i from 1:N
       else
         CGL_WEIGHT=4.0*atan(1.0)/dble(N-1)
       end if
+      CGL_WEIGHT=CGL_WEIGHT*sqrt(1.0-CGL_POINT(N,I)**2)
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -639,9 +640,9 @@ C     i from 1:N
       return
       end 
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      real function CG_WEIGHT(N)
-      integer N
-      CG_WEIGHT=4.0*atan(1.0)/dble(N)
+      real function CG_WEIGHT(N,I)
+      integer N,I
+      CG_WEIGHT=4.0*atan(1.0)/dble(N)*sqrt(1.0-CG_POINT(N,I)**2)
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
