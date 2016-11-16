@@ -39,6 +39,9 @@ C---------------End user input for parameters
 C---------------------------------------------     
     !Parameter for error codes in findpnts
       integer nFFTrcode(nFFTtotal)
+    !Parameter for global domain size
+      integer, parameter::nFFTGx=nFFTblX*nFFTlx1,nFFTGy=nFFTblY*nFFTly1,
+     $  nFFTGz=nFFTbZ*nFFTlz1
     !Refernce for dimensions of FFT grid in vector form
       integer nFFTdims(3)
     !Array for element id's where points exist

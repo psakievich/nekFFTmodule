@@ -87,25 +87,25 @@ C     FFT in the theta direction
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-      common /myDomainRange/rMax,zMax,zMin,nGx1,nGy1,nGz1
+      common /myDomainRange/rMax,zMax,zMin,
+     $ rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
       real PI
 
       integer i,j,k,ii,ntot
-      integer iG,jG,kG,nGx1,nGy1,nGz1
+      integer iG,jG,kG
       real dR,dTheta,dZ,Rval,Tval,Zval,Xval,Yval
       real rMax,zMax,zMin
-      nGx1=nFFTlx1*nFFTblx
-      nGy1=nFFTly1*nFFTbly
-      nGz1=nFFTlz1*nFFTblz
 
       ntot=lx1*ly1*lz1*lelv
       zMax=glmax(zm1,ntot)
       zMin=glmin(zm1,ntot)
       rMax=glmax(xm1,ntot)
-      if(nid.eq.0)write(6,*)nGx1,nGy1,nGz1
-      if(nid.eq.0)write(6,*)zMin,zMax,rMax
       PI=4.0*atan(1.0)
 
+      !Determine R locations
+      call ZWGJD(rRPnt,rRWgt,nFFTGy,0.,0.)
+      !Determin Z locations
+      call ZWGJD(rZPnt,rZWgt,nFFTGz,0.,0.)
 C      dR=xMax/(nFFTly1*nFFTbly-1)
       dTheta=2.0*PI/(nFFTlx1*nFFTblx)
 C      dZ=1.0/(nFFTlz1*nFFTblZ-1)
@@ -124,9 +124,9 @@ C      dZ=1.0/(nFFTlz1*nFFTblZ-1)
                 ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
                 call FFT_L2G(i,j,k,iG,jG,kG,nid)
                 
-                Rval=rMax*(0.5*QuadPnt(nGy1,jG)+0.5)
+                Rval=rMax*(0.5*rRPnt(jG)+0.5)
                 Tval=dTheta*(k-1)
-                Zval=zMin+(zMax-zMin)*(0.5*QuadPnt(nGz1,iG)+0.5)
+                Zval=zMin+(zMax-zMin)*(0.5*rZPnt(iG)+0.5)
 
                 rFFTpts(1,ii)=Rval*cos(Tval)
                 rFFTpts(2,ii)=Rval*sin(Tval)
@@ -439,8 +439,6 @@ C     seperate file.  Data is collected onto rank0 and written there
 
       integer,parameter::nInFFT=nFFTlx1
       integer,parameter::nInSlice=nFFTly1*nFFTbly*nFFTlz1*nFFTblZ
-      integer,parameter::nGx=nFFTly1*nFFTblY
-      integer,parameter::nGZ=nFFTlz1*nFFTblZ
 
       !Define Size of array for wave number
       real dataOutReal(nFFTflds,nInSlice)
@@ -455,7 +453,7 @@ C     seperate file.  Data is collected onto rank0 and written there
       integer,dimension(3):: nDimension
       character*32 chFileName
 
-      data nDimension /nGx,1,nGz/
+      data nDimension /nFFTGx,1,nFFTGz/
       !Loop over the wave numbers
       do i=1,16
         !Zero out workign arrays
@@ -549,7 +547,8 @@ C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-      common /myDomainRange/rMax,zMax,zMin,nGx1,nGy1,nGz1
+      common /myDomainRange/rMax,zMax,zMin,
+     $ rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
       real EnergyWave(nFFTflds,nFFTlx1),EnergyWork(nFFTflds,nFFTlx1)
       real radius
       integer nFFToutstep,ii,iii,iG,jG,kG
@@ -569,7 +568,7 @@ C             Divide by nFFTlx1 to normalize the Fourier Coefficient
               EnergyWave(k,j)=EnergyWave(k,j)+
      $         real(dconjg(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1))
      $               *(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1)))
-     $               *radius*QuadWgt(nGy1,jG)*QuadWgt(nGz1,iG)
+     $               *radius*rRWgt(jG)*rZWgt(iG)
      $               *0.25*rMax*(zMax-zMin)
            end do
         end do
