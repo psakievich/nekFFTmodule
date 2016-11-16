@@ -118,15 +118,15 @@ C      dZ=1.0/(nFFTlz1*nFFTblZ-1)
           if(if3d) rFFTpts(3,i)=0.0
        end do
       else !Initialize fields for processors of interest
-       do i=1,nFFTlz1
+       do k=1,nFFTlz1
           do j=1,nFFTly1
-             do k=1,nFFTlx1
-                ii=(k-1)+(j-1)*nFFTlx1+(i-1)*nFFTlx1*nFFTly1+1
+             do i=1,nFFTlx1
+                ii=i+(j-1)*nFFTlx1+(k-1)*nFFTlx1*nFFTly1
                 call FFT_L2G(i,j,k,iG,jG,kG,nid)
                 
                 Rval=rMax*(0.5*rRPnt(jG)+0.5)
-                Tval=dTheta*(k-1)
-                Zval=zMin+(zMax-zMin)*(0.5*rZPnt(iG)+0.5)
+                Tval=dTheta*(i-1)
+                Zval=zMin+(zMax-zMin)*(0.5*rZPnt(kG)+0.5)
 
                 rFFTpts(1,ii)=Rval*cos(Tval)
                 rFFTpts(2,ii)=Rval*sin(Tval)
@@ -252,6 +252,7 @@ C     This is the routine where the actual interpolation takes place
      &                     rFFTrst,ndim,nFFTtotal,
      &                     rFFTwrk(1,ifld))
          do j=1,nFFTtotal
+            !cFFTvals(j,ifld)=DCMPLX(rFFTwrk(j,ifld),0.d0)
             cFFTvals(j,ifld)=DCMPLX(rFFTvals(ifld,j),0.d0)
          end do
       enddo
@@ -450,10 +451,11 @@ C     seperate file.  Data is collected onto rank0 and written there
       real theta
       !Define number of wave numbers to output
       integer nMyWave,nFFToutstep
+      integer iG,jG,kG
       integer,dimension(3):: nDimension
       character*32 chFileName
 
-      data nDimension /nFFTGx,1,nFFTGz/
+      data nDimension /nFFTGy,1,nFFTGz/
       !Loop over the wave numbers
       do i=1,16
         !Zero out workign arrays
@@ -464,19 +466,20 @@ C     seperate file.  Data is collected onto rank0 and written there
         call rzero(dataWrkPts,nInSlice*3)
         !populate local spot in the array
         if(nid.lt.nFFTp2c)then
-        do j=1,nFFTlz1
-          do k=1,nFFTly1
-            kg=(k)+mod(nid,nFFTblY)*nFFTly1 
-            jg=(j)+(nid/nFFTblY)*nFFTlz1
-            iii=(i)+(k-1)*nFFTlx1+(j-1)*nFFTlx1*nFFTly1
-            ii=(kg)+(jg-1)*nFFTly1*nFFTbly 
+        do k=1,nFFTlz1
+          do j=1,nFFTly1
+            call FFT_L2G(i,j,k,iG,jG,kG,nid)
+            !kg=(k)+mod(nid,nFFTblY)*nFFTly1 
+            !jg=(j)+(nid/nFFTblY)*nFFTlz1
+            iii=(i)+(j-1)*nFFTlx1+(k-1)*nFFTlx1*nFFTly1
+            ii=(jg)+(kg-1)*nFFTly1*nFFTbly 
          !   if(nid.eq.1) write(6,*) i,j,k,ii,iii,"INDEX"
             if(i.lt.nInFFT/2)then
                nMyWave=i-1
             else
                nMyWave=nInFFT-i
             endif
-            theta=GetAngle(rFFTpts(1,iii),rFFTpts(2,iii))
+           ! theta=GetAngle(rFFTpts(1,iii),rFFTpts(2,iii))
             !Convert to cylindrical coordinates
             dataOutPts(1,ii)=sqrt(rFFTpts(1,iii)**2+rFFTpts(2,iii)**2)
             dataOutPts(2,ii)=0.d0
@@ -554,21 +557,21 @@ C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
       integer nFFToutstep,ii,iii,iG,jG,kG
       character*80 fileName
       call rzero(EnergyWave,nFFTflds*nFFTlx1)
-      do i=1,nFFTlz1
-      do ii=1,nFFTly1
-        do j=1,nFFTlx1
+      do ii=1,nFFTlz1
+      do j=1,nFFTly1
+        do i=1,nFFTlx1
            do k=1,nFFTflds
-              call FFT_L2G(i,ii,j,iG,jG,kG,nid)
-              iii=(ii-1)+(i-1)*nFFTly1
-              radius=sqrt(rFFTpts(1,j+iii*nFFTlx1)**2+
-     $             rFFTpts(2,j+iii*nFFTlx1)**2)
+              call FFT_L2G(i,j,ii,iG,jG,kG,nid)
+              iii=(j-1)+(ii-1)*nFFTly1
+              radius=sqrt(rFFTpts(1,i+iii*nFFTlx1)**2+
+     $             rFFTpts(2,i+iii*nFFTlx1)**2)
 
 C             Ek=sum_z sum_r phi(r,z)*CC[phi(r,z)] *wr*R/2*wz*H/2
 C             Divide by nFFTlx1 to normalize the Fourier Coefficient
-              EnergyWave(k,j)=EnergyWave(k,j)+
-     $         real(dconjg(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1))
-     $               *(cFFTvals(j+iii*nFFTlx1,k)/dble(nFFTlx1)))
-     $               *radius*rRWgt(jG)*rZWgt(iG)
+              EnergyWave(k,i)=EnergyWave(k,i)+
+     $         real(dconjg(cFFTvals(i+iii*nFFTlx1,k)/dble(nFFTlx1))
+     $               *(cFFTvals(i+iii*nFFTlx1,k)/dble(nFFTlx1)))
+     $               *radius*rRWgt(jG)*rZWgt(kG)
      $               *0.25*rMax*(zMax-zMin)
            end do
         end do
@@ -592,18 +595,18 @@ C             Divide by nFFTlx1 to normalize the Fourier Coefficient
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       subroutine FFT_L2G(iL,jL,kL,iG,jG,kG,me)
 C     MAP LOCAL INDEX IN GRID TO GLOBAL INDEX
-C     K-Innermost loop corresponding to nFFTlx1
+C     I-Innermost loop corresponding to nFFTlx1
 C     J-Middle loop corresponding to nFFTly1
-C     I-Outermost loop corresponding to nFFTlz1
+C     K-Outermost loop corresponding to nFFTlz1
 C     me-mpi rank
       include 'SIZE'
       include 'MYFFT'
       integer iL,jL,kL,iG,jG,kG,me
 c      write(6,*)'INSIDE FFT_L2G',nFFTbly,me
 c      write(6,*) iL,jL,kL,iG,jG,kG,me
-      iG=iL+(me/nFFTblY)*nFFTlz1
+      kG=kL+(me/nFFTblY)*nFFTlz1
       jG=jL+mod(me,nFFTblY)*nFFTly1
-      kG=kL
+      iG=iL
 c      write(6,*) iL,jL,kL,iG,jG,kG,me
       return
       end
