@@ -87,10 +87,10 @@ C     FFT in the theta direction
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-      common /myDomainRange/rMax,zMax,zMin,
-     $ rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
+      common /myDomainRange/rMax,zMax,zMin,rRPnt,rRWgt,rZPnt,rZWgt
       real PI
 
+      real rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
       integer i,j,k,ii,ntot
       integer iG,jG,kG
       real dR,dTheta,dZ,Rval,Tval,Zval,Xval,Yval
@@ -457,7 +457,7 @@ C     seperate file.  Data is collected onto rank0 and written there
 
       data nDimension /nFFTGy,1,nFFTGz/
       !Loop over the wave numbers
-      do i=1,16
+      do i=1,nInFFT/2+1
         !Zero out workign arrays
         call rzero(dataOutReal,nInSlice*nFFTflds)
         call rzero(dataOutComp,nInSlice*nFFTflds)
@@ -498,8 +498,8 @@ C     seperate file.  Data is collected onto rank0 and written there
         call gop(dataOutReal,dataWork,'+  ',nInSlice*nFFTflds)
         call gop(dataOutComp,dataWork,'+  ',nInSlice*nFFTflds)
         !write data to file on rank0
-         write(chFileName,"('WAVE_',I0,'_TSTEP')")
-     $                         nMyWave
+         write(chFileName,"('./Snaps/',I0,'/SymS1_',I0,'_TSTEP')")
+     $                         i-1,nMyWave
         if(nid.eq.0) call dwritevtsc(nFFToutstep,nDimension,nFFTflds,
      $     dataOutPts,
      $                    dataOutReal,dataOutComp,chFileName)
@@ -550,8 +550,8 @@ C      ---> \int_0^R\int_0^H A(r,z)*A(r,z) r dr dz (*is complex conj)
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-      common /myDomainRange/rMax,zMax,zMin,
-     $ rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
+      common /myDomainRange/rMax,zMax,zMin,rRPnt,rRWgt,rZPnt,rZWgt
+      real rRPnt(nFFTGy),rRWgt(nFFTGy),rZPnt(nFFTGz),rZWgt(nFFTGz)
       real EnergyWave(nFFTflds,nFFTlx1),EnergyWork(nFFTflds,nFFTlx1)
       real radius
       integer nFFToutstep,ii,iii,iG,jG,kG
@@ -579,7 +579,7 @@ C             Divide by nFFTlx1 to normalize the Fourier Coefficient
       end do
       call gop(EnergyWave,EnergyWork,'+  ',nFFTflds*nFFTlx1)
 
-      write(fileName,"('EnergyReport_',I0,'.dat')")nFFToutstep
+      write(fileName,"('./Snaps/EnergyReport_',I0,'.dat')")nFFToutstep
       if(nid.eq.0)then
         open(unit=10,file=fileName,status='REPLACE')
         do i =1,nFFTlx1/2
