@@ -21,11 +21,11 @@ C----------------------------------------------------------------------
 C--------------Start user input for parameters
 C---------------------------------------------
     !Number of processors that will use FFT
-      integer, parameter::nFFTp2c=2048
+      integer, parameter::nFFTp2c=32
     !Number of blocks you domain is divided into in each direction
-      integer, parameter::nFFTblX=1,nFFTblY=32,nFFTblZ=nFFTp2c/nFFTbly                   
+      integer, parameter::nFFTblX=1,nFFTblY=8,nFFTblZ=nFFTp2c/nFFTbly                   
     !Local sampling of field (any FFT dim must span global domain)
-      integer, parameter::nFFTlx1=2048,nFFTly1=5,nFFTlz1=1
+      integer, parameter::nFFTlx1=32,nFFTly1=8,nFFTlz1=16
     !Order of FFT (1d,2d,3d)=1,2,3
       integer, parameter::nFFTorder=1
     !Number of fields to perform FFT on
@@ -41,7 +41,7 @@ C---------------------------------------------
       integer nFFTrcode(nFFTtotal)
     !Parameter for global domain size
       integer, parameter::nFFTGx=nFFTblX*nFFTlx1,nFFTGy=nFFTblY*nFFTly1,
-     $  nFFTGz=nFFTbZ*nFFTlz1
+     $  nFFTGz=nFFTblZ*nFFTlz1
     !Refernce for dimensions of FFT grid in vector form
       integer nFFTdims(3)
     !Array for element id's where points exist

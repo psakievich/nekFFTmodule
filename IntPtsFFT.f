@@ -647,14 +647,14 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       real function QuadPnt(N,I)
       integer N,I
-      QuadPnt=GL_POINT(N,I)
+      QuadPnt=CG_POINT(N,I)
       !QuadPnt=CGL_POINT(N,I)
       return
       end
 C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       real function QuadWgt(N,I)
       integer N,I
-      QuadWgt=GL_Weight(N)
+      QuadWgt=CG_Weight(N)
       !QuadWgt=CGL_Weight(N,I)
       return
       end
