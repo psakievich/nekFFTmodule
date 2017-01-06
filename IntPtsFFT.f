@@ -49,19 +49,17 @@ C     SUBROUTINE MYFFT
            call FFT_Define_Points()
           ! call FFT_Find_Points()
       end if
-      !if(nFFTdmanual.ne.1.or.nFFTsetup.eq.0)then
-      !     call FFT_Create_Plan()
-      !endif
       nFFTSetup=1
       ! 3) Perform Interpolation
            call FFT_Find_Points()
           ! call FFT_Interp_Points()
+c      if(nid.lt.nFFTp2c)then
+c       write(chFilename,"('Integral/IntSnap_')")
+c       call dwritevts(nFFToutstep,nFFTdims,nFFTflds,rFFTpts,rFFTvals,
+c     $ chFilename)
+c      endif
       if(nFFTdmanual.ne.1.or.nFFTsetup.eq.0)then
            call FFT_Create_Plan()
-      endif
-      if(nid.lt.nFFTp2c)then
-       write(chFilename,"(A4)")"test"
-       call dwritevts(nid,nFFTdims,nFFTflds,rFFTpts,rFFTvals,chFilename)
       endif
       ! 3a) Convert velocity to cylindrical coordinates
            call FFT_Cart2Cyl_Vel()
@@ -74,7 +72,7 @@ C     SUBROUTINE MYFFT
       ! 6) If desired write to file
       !     call FFT_ASCII_PRINT()
            call FFT_OUTPUT_WAVENUMBERS(nFFToutstep)
-           call FFT_ENERGY_REPORT(nFFToutstep)
+      !     call FFT_ENERGY_REPORT(nFFToutstep)
       nFFToutstep=nFFToutstep+1
       return
       end
@@ -474,10 +472,10 @@ C     seperate file.  Data is collected onto rank0 and written there
             iii=(i)+(j-1)*nFFTlx1+(k-1)*nFFTlx1*nFFTly1
             ii=(jg)+(kg-1)*nFFTly1*nFFTbly 
          !   if(nid.eq.1) write(6,*) i,j,k,ii,iii,"INDEX"
-            if(i.lt.nInFFT/2)then
+            if(i.le.nInFFT/2)then
                nMyWave=i-1
             else
-               nMyWave=nInFFT-i
+               nMyWave=(i-1)-nInFFT
             endif
            ! theta=GetAngle(rFFTpts(1,iii),rFFTpts(2,iii))
             !Convert to cylindrical coordinates
