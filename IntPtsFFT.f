@@ -518,6 +518,8 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
              locTheta=getangle(rFFTpts(1,i),rFFTpts(2,i))
          cFFTvals(i,1)=velX*cos(locTheta)+velY*sin(locTheta)
          cFFTvals(i,2)=-velX*sin(locTheta)+velY*cos(locTheta)
+         !turn pressure into kinematic heat flux
+         cFFTvals(i,4)=cFFTvals(i,3)*cFFTvals(i,5)
       end do
   
       return
