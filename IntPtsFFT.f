@@ -433,11 +433,11 @@ C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 C     SUBROUTINE FFT_OUTPUT_WAVENUMBERS()
 C     This subroutine is to output the data for each wave number in a
 C     seperate file.  Data is collected onto rank0 and written there
-      subroutine FFT_OUTPUT_WAVENUMBERS(nFFToutstep)
+      subroutine FFT_OUTPUT_WAVENUMBERS(nFFToutstep,chFileName)
       include 'SIZE'
       include 'TOTAL'
       include 'MYFFT'
-
+      character*32 chFileName
       integer,parameter::nInFFT=nFFTlx1
       integer,parameter::nInSlice=nFFTly1*nFFTbly*nFFTlz1*nFFTblZ
 
@@ -453,7 +453,6 @@ C     seperate file.  Data is collected onto rank0 and written there
       integer nMyWave,nFFToutstep
       integer iG,jG,kG
       integer,dimension(3):: nDimension
-      character*32 chFileName
 
       data nDimension /nFFTGy,1,nFFTGz/
       !Loop over the wave numbers
@@ -498,8 +497,8 @@ C     seperate file.  Data is collected onto rank0 and written there
         call gop(dataOutReal,dataWork,'+  ',nInSlice*nFFTflds)
         call gop(dataOutComp,dataWork,'+  ',nInSlice*nFFTflds)
         !write data to file on rank0
-         write(chFileName,"('./Snaps/',I0,'/SymS1_',I0,'_TSTEP')")
-     $                         i-1,nMyWave
+C         write(chFileName,"('./Snaps/',I0,'/SymS1_',I0,'_TSTEP')")
+C     $                         i-1,nMyWave
         if(nid.eq.0) call dwritevtsc(nFFToutstep,nDimension,nFFTflds,
      $     dataOutPts,
      $                    dataOutReal,dataOutComp,chFileName)
